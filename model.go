@@ -221,7 +221,7 @@ func (m *model) layout() {
 		for l := c.Start; l <= c.End; l++ {
 			m.commentedSet[[2]int{c.File, l}] = true
 		}
-		text := ansi.Wrap(strings.TrimSpace(c.Text), max(10, cw-4), "")
+		text := ansi.Wrap(strings.TrimSpace(c.Text), max(10, cw-3), "")
 		m.commentText[ci] = append([]string{""}, strings.Split(text, "\n")...)
 	}
 

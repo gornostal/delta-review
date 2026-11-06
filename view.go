@@ -298,9 +298,9 @@ func (m *model) renderCommentRow(rw row, gw, cw int) string {
 		if m.mode == modeComment && m.editing == rw.comment {
 			lbl += " (editing)"
 		}
-		content = bar.Render(" ╭─ ") + bg.Foreground(colComment).Bold(true).Render(fit(lbl, cw-4))
+		content = bar.Render(" ▎ ") + bg.Foreground(colComment).Bold(true).Render(fit(lbl, cw-3))
 	} else {
-		content = bar.Render(" │  ") + bg.Foreground(colFg).Render(fit(m.commentText[rw.comment][rw.seg], cw-4))
+		content = bar.Render(" ▎ ") + bg.Foreground(colFg).Render(fit(m.commentText[rw.comment][rw.seg], cw-3))
 	}
 	return strings.Repeat(" ", gw) + content
 }
