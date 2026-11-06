@@ -11,7 +11,8 @@ import (
 var (
 	colDim       = lipgloss.AdaptiveColor{Light: "245", Dark: "243"}
 	colFg        = lipgloss.AdaptiveColor{Light: "235", Dark: "252"}
-	colHeaderBg  = lipgloss.AdaptiveColor{Light: "254", Dark: "236"}
+	colHeaderBg  = lipgloss.AdaptiveColor{Light: "252", Dark: "238"}
+	colHeaderDim = lipgloss.AdaptiveColor{Light: "243", Dark: "247"}
 	colSel       = lipgloss.AdaptiveColor{Light: "153", Dark: "24"}
 	colCursor    = lipgloss.AdaptiveColor{Light: "166", Dark: "214"}
 	colComment   = lipgloss.AdaptiveColor{Light: "130", Dark: "221"}
@@ -153,7 +154,7 @@ func (m *model) renderFileHeader(fi int, sticky bool) string {
 	if m.viewed[fi] {
 		right = append(right, s(st().Foreground(colGreen).Bold(true), "✓"+viewedLbl))
 	} else {
-		right = append(right, s(st().Foreground(colDim), "☐"+viewedLbl))
+		right = append(right, s(st().Foreground(colHeaderDim), "☐"+viewedLbl))
 	}
 	rightStr := strings.Join(right, s(st(), "  ")) + s(st(), " ")
 	rw := ansi.StringWidth(rightStr)
@@ -182,7 +183,7 @@ func (m *model) renderFileHeader(fi int, sticky bool) string {
 	pathW := max(5, dw-4-rw-labelW-2)
 	path := truncLeft(f.DisplayPath(), pathW)
 
-	left := bar + s(st().Foreground(colDim), " "+arrow+" ") + s(st().Bold(true).Foreground(colFg), path)
+	left := bar + s(st().Foreground(colHeaderDim), " "+arrow+" ") + s(st().Bold(true).Foreground(colFg), path)
 	if label != "" {
 		left += s(st(), "  ") + s(st().Foreground(colHunk), label)
 	}
@@ -367,7 +368,11 @@ func (m *model) renderSidebar(sw, h int) []string {
 		if isCur {
 			nameStyle = nameStyle.Bold(true)
 		}
-		left := bar + icon + s(st().Foreground(colDim), dir) + s(nameStyle, name)
+		dirCol := colDim
+		if isCur {
+			dirCol = colHeaderDim
+		}
+		left := bar + icon + s(st().Foreground(dirCol), dir) + s(nameStyle, name)
 		gap := sw - ansi.StringWidth(left) - ansi.StringWidth(right)
 		line := left + s(st(), strings.Repeat(" ", max(0, gap))) + right
 		if gap < 0 {
