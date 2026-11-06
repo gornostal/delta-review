@@ -236,3 +236,91 @@ func TestColoredInput(t *testing.T) {
 		t.Fatalf("got %+v", f)
 	}
 }
+
+// `git show A B` output: commit headers come between files.
+const showSample = `commit 1111111111111111111111111111111111111111
+Author: A U Thor <a@example.com>
+Date:   Fri Nov 6 17:41:49 2026 +0200
+
+    First commit
+
+diff --git a/x b/x
+index 1..2 100644
+--- a/x
++++ b/x
+@@ -1 +1 @@
+-x
++y
+
+commit 2222222222222222222222222222222222222222
+Merge: 1111111 3333333
+Author: A U Thor <a@example.com>
+Date:   Fri Nov 6 17:42:49 2026 +0200
+
+    Merge branch 'b'
+
+diff --cc m
+index 1,2..3
+--- a/m
++++ b/m
+@@@ -1,1 -1,1 +1,1 @@@
+- one
+ -two
+++three
+
+commit 4444444444444444444444444444444444444444
+Author: A U Thor <a@example.com>
+Date:   Fri Nov 6 17:43:49 2026 +0200
+
+    Rename only
+
+diff --git a/old b/new
+similarity index 100%
+rename from old
+rename to new
+
+commit 5555555555555555555555555555555555555555
+Author: A U Thor <a@example.com>
+Date:   Fri Nov 6 17:44:49 2026 +0200
+
+    Touch x again
+
+diff --git a/x b/x
+index 2..3 100644
+--- a/x
++++ b/x
+@@ -1 +1 @@
+-y
++z
+`
+
+func TestGitShow(t *testing.T) {
+	files := ParseDiff(showSample)
+	if len(files) != 4 {
+		t.Fatalf("want 4 files, got %d", len(files))
+	}
+	for _, f := range files {
+		if f.Malformed {
+			t.Errorf("%s: malformed", f.Path())
+		}
+		for _, l := range f.Raw {
+			if l == "" || strings.HasPrefix(l, "commit ") || strings.HasPrefix(l, "    ") {
+				t.Errorf("%s: commit header leaked into the file: %q", f.Path(), l)
+			}
+		}
+	}
+	if f := files[1]; !f.Combined || len(f.Lines) != 3 {
+		t.Errorf("merge: want 3 combined lines, got %+v", f.Lines)
+	}
+	if f := files[2]; f.Status != "renamed" || f.Path() != "new" {
+		t.Errorf("rename: got %s %s", f.Status, f.Path())
+	}
+	if files[0].Hash == files[3].Hash {
+		t.Error("same path in two commits should hash differently")
+	}
+	// a single commit must hash like plain diff output of the same change
+	diffOnly := showSample[strings.Index(showSample, "diff --git a/x"):strings.Index(showSample, "\ncommit 2222")]
+	if ParseDiff(diffOnly)[0].Hash != files[0].Hash {
+		t.Error("show and diff output of the same change should hash the same")
+	}
+}

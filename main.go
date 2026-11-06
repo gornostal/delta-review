@@ -22,9 +22,11 @@ const usage = `delta-review — review a git diff, leave line comments, print th
 
 Usage:
   delta-review [git diff args...]     e.g. delta-review --cached, delta-review main...HEAD
+  delta-review show [git show args...]  review commits, e.g. delta-review show HEAD~2
   git diff ... | delta-review         review a diff read from stdin
 
 Works as a git pager too:  git config --global pager.diff delta-review
+                           git config --global pager.show delta-review
 Input that isn't a plain diff (--stat, --word-diff, ...) is passed on to
 git's regular pager.
 
@@ -77,17 +79,22 @@ func run(args []string) error {
 			source = "stdin diff"
 		}
 	} else {
-		gitArgs := append([]string{"-c", "core.quotePath=false", "diff", "--no-color", "--no-ext-diff",
+		// `delta-review show [args]` reviews commits; anything else is git diff args
+		sub := "diff"
+		if len(args) > 0 && args[0] == "show" {
+			sub, args = "show", args[1:]
+		}
+		gitArgs := append([]string{"-c", "core.quotePath=false", sub, "--no-color", "--no-ext-diff",
 			"--src-prefix=a/", "--dst-prefix=b/"}, args...)
 		cmd := exec.Command("git", gitArgs...)
 		var stderr bytes.Buffer
 		cmd.Stderr = &stderr
 		out, err := cmd.Output()
 		if err != nil {
-			return fmt.Errorf("git diff failed: %v\n%s", err, strings.TrimSpace(stderr.String()))
+			return fmt.Errorf("git %s failed: %v\n%s", sub, err, strings.TrimSpace(stderr.String()))
 		}
 		diffText = string(out)
-		source = strings.TrimSpace("git diff " + strings.Join(args, " "))
+		source = strings.TrimSpace("git " + sub + " " + strings.Join(args, " "))
 	}
 
 	files := ParseDiff(diffText)

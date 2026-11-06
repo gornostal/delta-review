@@ -64,6 +64,7 @@ type FileDiff struct {
 	gitA, gitB          string // from "diff --git A B"
 	minusPath, plusPath string // from "--- " / "+++ "
 	explicitPaths       bool   // rename/copy from/to lines gave exact paths
+	binaryPatch         bool   // "GIT binary patch": data lines follow the header
 }
 
 func (f *FileDiff) Path() string {
@@ -117,9 +118,8 @@ func ParseDiff(text string) []*FileDiff {
 
 		if inHunk {
 			if cur.Combined {
-				if strings.HasPrefix(l, "diff ") {
-					inHunk = false
-				} else if strings.HasPrefix(l, "@@") {
+				if l == "" || !strings.ContainsRune(" +-", rune(l[0])) {
+					// next file or hunk, or the next commit of `git show A B`
 					inHunk = false
 				} else {
 					cur.Raw = append(cur.Raw, l)
@@ -222,6 +222,10 @@ func ParseDiff(text string) []*FileDiff {
 			// plain unified diff without a "diff --git" line
 			finish()
 			cur = &FileDiff{Status: "modified"}
+		case cur != nil && !cur.binaryPatch && (len(cur.Hunks) > 0 || !isHeaderLine(l)):
+			// not part of this file, e.g. the next commit's header in `git show A B`
+			finish()
+			continue
 		case cur == nil:
 			continue // preamble (e.g. commit message from git show)
 		}
@@ -296,8 +300,26 @@ func parseHeaderLine(f *FileDiff, l string) {
 		}
 	case strings.HasPrefix(l, "Binary files ") || strings.HasPrefix(l, "GIT binary patch"):
 		f.Binary = true
+		f.binaryPatch = strings.HasPrefix(l, "GIT binary patch")
 		f.Notes = append(f.Notes, "Binary file changed")
 	}
+}
+
+// headerPrefixes are the lines that can appear between a file's "diff" line
+// and its first hunk.
+var headerPrefixes = []string{
+	"diff ", "--- ", "+++ ", "index ", "old mode ", "new mode ", "new file mode ",
+	"deleted file mode ", "similarity index ", "dissimilarity index ", "rename from ",
+	"rename to ", "copy from ", "copy to ", "Binary files ", "GIT binary patch",
+}
+
+func isHeaderLine(l string) bool {
+	for _, p := range headerPrefixes {
+		if strings.HasPrefix(l, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // splitGitDiffLine splits the operands of `diff --git A B` (possibly quoted)

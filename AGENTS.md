@@ -12,8 +12,9 @@ git, and optionally delta and a clipboard tool.
 
 1. **Directly**: `delta-review [git diff args]`. It runs `git diff` itself with colour, external
    diff tools and path quoting turned off and the standard `a/` `b/` prefixes forced.
+   `delta-review show [args]` does the same with `git show`.
 2. **Reading stdin**: `some-command | delta-review`, used for diffs from other tools.
-3. **As git's pager** (`pager.diff`). This is the stdin case with extra behaviour:
+3. **As git's pager** (`pager.diff`, `pager.show`). This is the stdin case with extra behaviour:
    - git colours output for pagers, so ANSI codes are stripped before parsing;
    - the user's prefix settings (mnemonic `i/` `w/`, or none) are detected from the headers;
    - the git command line is read from the parent process to label the review;
@@ -32,6 +33,9 @@ be pipes.
    resolved after the whole header is read: rename/copy lines win, then `---`/`+++`, then the
    `diff --git` line. Renames, mode changes, binary files and empty files get a short note
    instead of hunks. Hunk line counts are checked; a mismatch marks the file malformed.
+   Text outside files (commit headers and messages from `git show`, also between commits) is
+   skipped: a line that isn't a header line ends the current file, so it never reaches delta
+   or the fingerprint. The same path can appear more than once when several commits are shown.
 2. **Order**: files whose path has a word starting with "test" (split on non-letters and
    camelCase, so `latest.py` doesn't match) move to the end. Otherwise the diff order is kept.
 3. **Viewed state**: each file gets a fingerprint, a hash of its paths, status, notes and hunk
