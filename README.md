@@ -18,11 +18,17 @@ gh pr diff 123 | delta-review     # or read a diff from stdin
 ```ini
 [pager]
 	diff = $(command -v delta-review || command -v delta-themed || echo delta)
+	show = $(command -v delta-review || command -v delta-themed || echo delta)
+	stash = $(command -v delta-review || command -v delta-themed || echo delta)
 ```
 
-`git diff ...` then opens the review UI. Input that isn't a plain diff (`--stat`, `--word-diff`,
-`--name-only`) is handed to git's regular pager (`core.pager`). Bypass once with
-`git -c pager.diff=delta diff`.
+`git diff ...` (including `--cached`), `git show` and `git stash show -p` then open the review UI;
+the commit message in `git show` output is skipped. Input that isn't a plain diff (`--stat`,
+`--word-diff`, `--name-only`, `git stash list`, the messages of `git stash`/`git stash pop`) is
+handed to git's regular pager (`core.pager`). Bypass once with `git -c pager.diff=delta diff`.
+
+`pager.log` is best left unset: the review UI reads all of its input before showing anything,
+so a plain `git log` would wait for the whole history.
 
 ## Features
 
