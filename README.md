@@ -5,7 +5,7 @@ Leave comments on lines or ranges; on `q` they are printed as Markdown and copie
 clipboard, ready to paste into a Claude Code session.
 
 ```sh
-go install .                      # installs ~/go/bin/delta-review
+sudo ./install.sh                 # builds and installs /usr/local/bin/delta-review
 
 delta-review                      # git diff
 delta-review --cached             # any git diff arguments are passed through

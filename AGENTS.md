@@ -116,7 +116,7 @@ its own gutter (cursor/selection bar, comment marker, old and new numbers, sign)
 ```sh
 go test ./...          # parser, path/prefix handling, delta mapping (needs delta), output format
 go vet ./...
-go install .           # installs to ~/go/bin/delta-review (git's pager.diff points at it)
+sudo ./install.sh      # builds and installs /usr/local/bin/delta-review (git's pager.diff points at it)
 ```
 
 To check behaviour end to end, run it in a detached tmux session (`tmux new-session -d -x 120
