@@ -35,7 +35,9 @@ gh pr diff 123 | delta-review     # or read a diff from stdin
   (default `~/.local/state`), so the file stays collapsed until its diff changes.
 - Files whose path contains the word "test" (`foo_test.go`, `tests/`, `FooTest.java`, but not
   `latest.py`) are listed last.
-- File list sidebar (`e`), word wrap (`w`), status bar with key hints and a viewed progress bar.
+- File list (`e`, hidden by default): a sidebar on wide terminals, a full-screen page on narrow
+  ones (under 80 columns, e.g. a phone). Word wrap is on by default (`w`); line numbers are
+  hidden by default (`#`). Status bar with key hints and a viewed progress bar.
 - Comments live in memory only. On `q` they are printed and copied to the clipboard via
   `wl-copy`, `xclip`, `xsel` or `pbcopy` (override with `DELTA_REVIEW_CLIPBOARD`), falling back
   to the OSC 52 escape sequence.
@@ -52,7 +54,7 @@ gh pr diff 123 | delta-review     # or read a diff from stdin
 | `d d` | delete the comment under the cursor |
 | `v` | toggle viewed |
 | `o`/`z`, `Z` | collapse/expand file, all files |
-| `w` / `e` / `?` | word wrap / file list / help |
+| `w` / `#` / `e` / `?` | word wrap / line numbers / file list / help |
 | `h`/`l` | horizontal scroll when wrap is off |
 | `q` | quit, print comments and copy them to the clipboard |
 | `ctrl+c` | quit without printing (asks again if there are comments) |

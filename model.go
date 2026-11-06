@@ -69,7 +69,9 @@ type model struct {
 	numW          int
 
 	wrap         bool
+	showNums     bool
 	showFiles    bool
+	fileSel      int // highlighted file in the full-screen file list (narrow screens)
 	sideOff      int
 	sideRows     []int // sidebar row -> file index (-1 for non-file rows)
 	lastSideFile int
@@ -101,7 +103,7 @@ func newModel(source string, files []*FileDiff, store *ViewedStore) *model {
 		anchor:       -1,
 		editing:      -1,
 		lastSideFile: -1,
-		showFiles:    true,
+		wrap:         true,
 	}
 	maxNo := 0
 	for fi, f := range files {
@@ -154,8 +156,17 @@ func (m *model) Init() tea.Cmd { return nil }
 
 // ---------- geometry ----------
 
+// narrowW is the width below which the screen is treated as narrow (a phone):
+// the file list takes the whole screen instead of being a sidebar.
+const narrowW = 80
+
+func (m *model) narrow() bool { return m.width < narrowW }
+
+// fileListFull reports whether the file list is open as a full-screen page.
+func (m *model) fileListFull() bool { return m.showFiles && m.narrow() }
+
 func (m *model) sidebarW() int {
-	if !m.showFiles || m.width < 70 {
+	if !m.showFiles || m.narrow() {
 		return 0
 	}
 	longest := 0
@@ -173,7 +184,12 @@ func (m *model) diffX() int {
 }
 
 func (m *model) diffW() int   { return max(20, m.width-m.diffX()) }
-func (m *model) gutterW() int { return 2*m.numW + 6 }
+func (m *model) gutterW() int {
+	if m.showNums {
+		return 2*m.numW + 6
+	}
+	return 4 // cursor bar, comment mark, sign, space
+}
 func (m *model) contentW() int {
 	return max(10, m.diffW()-m.gutterW())
 }
@@ -568,7 +584,11 @@ func (m *model) toggleCollapse(fi int) {
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		wasFull := m.fileListFull()
 		m.width, m.height = msg.Width, msg.Height
+		if m.fileListFull() && !wasFull {
+			m.fileSel = m.curFile()
+		}
 		m.ta.SetWidth(m.width)
 		m.layout()
 		m.ensureVisible()
@@ -647,6 +667,9 @@ func (m *model) tryAbort() tea.Cmd {
 }
 
 func (m *model) handleKey(msg tea.KeyMsg) tea.Cmd {
+	if m.fileListFull() {
+		return m.handleFileListKey(msg.String())
+	}
 	k := msg.String()
 	if k != "d" && k != "x" {
 		m.pendingDelete = false
@@ -729,6 +752,12 @@ func (m *model) handleKey(msg tea.KeyMsg) tea.Cmd {
 		}
 	case "e":
 		m.showFiles = !m.showFiles
+		m.fileSel = m.curFile()
+		m.lastSideFile = -1
+		m.layout()
+		m.ensureVisible()
+	case "#":
+		m.showNums = !m.showNums
 		m.layout()
 		m.ensureVisible()
 	case "v":
@@ -788,7 +817,8 @@ func (m *model) handleKey(msg tea.KeyMsg) tea.Cmd {
 
 func (m *model) handleMouse(msg tea.MouseMsg) tea.Cmd {
 	sw := m.sidebarW()
-	inSidebar := sw > 0 && msg.X < sw
+	full := m.fileListFull()
+	inSidebar := full || (sw > 0 && msg.X < sw)
 	h := m.viewH()
 
 	if tea.MouseEvent(msg).IsWheel() {
@@ -862,6 +892,10 @@ func (m *model) handleMouse(msg tea.MouseMsg) tea.Cmd {
 		r := m.sideOff + msg.Y
 		if r < len(m.sideRows) && m.sideRows[r] >= 0 {
 			fi := m.sideRows[r]
+			if full {
+				m.openFile(fi)
+				return nil
+			}
 			if m.collapsed[fi] {
 				m.collapsed[fi] = false
 				m.layout()
@@ -911,4 +945,45 @@ func (m *model) handleMouse(msg tea.MouseMsg) tea.Cmd {
 		}
 	}
 	return nil
+}
+
+// handleFileListKey handles keys while the file list fills the screen.
+func (m *model) handleFileListKey(k string) tea.Cmd {
+	if k != "ctrl+c" {
+		m.pendingQuit = false
+	}
+	m.message = ""
+	switch k {
+	case "q":
+		m.printOutput = true
+		return tea.Quit
+	case "ctrl+c":
+		return m.tryAbort()
+	case "?":
+		m.mode = modeHelp
+	case "j", "down", "n", "]", "tab":
+		m.fileSel = min(m.fileSel+1, len(m.files)-1)
+	case "k", "up", "p", "[", "shift+tab":
+		m.fileSel = max(m.fileSel-1, 0)
+	case "g", "home":
+		m.fileSel = 0
+	case "G", "end":
+		m.fileSel = len(m.files) - 1
+	case "enter", "l", "right", "o", " ":
+		m.openFile(m.fileSel)
+	case "e", "esc", "h", "left":
+		m.showFiles = false
+		m.layout()
+		m.ensureVisible()
+	}
+	return nil
+}
+
+// openFile closes the full-screen file list and jumps to file fi, expanding it.
+func (m *model) openFile(fi int) {
+	m.showFiles = false
+	m.collapsed[fi] = false
+	m.anchor = -1
+	m.layout()
+	m.jumpToFile(fi)
 }

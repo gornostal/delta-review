@@ -83,9 +83,14 @@ its own gutter (cursor/selection bar, comment marker, old and new numbers, sign)
   empty text deletes it.
 - **Viewed**: `v` saves the fingerprint, collapses the file and jumps to the next file.
   Pressing it again removes the mark.
-- **Layout**: optional file list on the left (follows the current file, separates tests),
-  diff pane on the right, comment editor above the status bar while typing, and a status bar
-  with key hints or a message plus comment count, wrap flag and a viewed progress bar.
+- **Layout**: optional file list (hidden by default; follows the current file, separates
+  tests), diff pane, comment editor above the status bar while typing, and a status bar with
+  key hints or a message plus comment count, a "nowrap" flag and a viewed progress bar. Word
+  wrap is on and line numbers are off by default (`#` shows them; the gutter shrinks to
+  cursor bar, comment marker and sign).
+- **Narrow screens** (under 80 columns, e.g. a phone): the file list is a full-screen page
+  instead of a sidebar, with its own selection (`fileSel`); picking a file closes it and jumps
+  there. The file header, status hints and progress bar are shortened.
 - **Input details**: several keys that arrive in one read are handled one at a time. Mouse
   reporting uses cell-motion mode, so wheel, click and drag work (native terminal selection
   needs shift).

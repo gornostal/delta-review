@@ -56,11 +56,16 @@ func (m *model) View() string {
 	}
 	h := m.viewH()
 	sw := m.sidebarW()
-	var side []string
-	if sw > 0 {
+	var side, diff []string
+	switch {
+	case m.fileListFull() && m.mode != modeHelp:
+		diff = m.renderSidebar(m.width, h)
+	case sw > 0:
 		side = m.renderSidebar(sw, h)
+		diff = m.renderDiff(h)
+	default:
+		diff = m.renderDiff(h)
 	}
-	diff := m.renderDiff(h)
 	sep := st().Foreground(colDim).Render("│")
 
 	out := make([]string, 0, m.height)
@@ -141,10 +146,14 @@ func (m *model) renderFileHeader(fi int, sticky bool) string {
 		right = append(right, s(st().Foreground(colGreen), fmt.Sprintf("+%d", f.Added))+s(st(), " ")+
 			s(st().Foreground(colRed), fmt.Sprintf("-%d", f.Removed)))
 	}
+	viewedLbl := " Viewed"
+	if m.narrow() {
+		viewedLbl = ""
+	}
 	if m.viewed[fi] {
-		right = append(right, s(st().Foreground(colGreen).Bold(true), "✓ Viewed"))
+		right = append(right, s(st().Foreground(colGreen).Bold(true), "✓"+viewedLbl))
 	} else {
-		right = append(right, s(st().Foreground(colDim), "☐ Viewed"))
+		right = append(right, s(st().Foreground(colDim), "☐"+viewedLbl))
 	}
 	rightStr := strings.Join(right, s(st(), "  ")) + s(st(), " ")
 	rw := ansi.StringWidth(rightStr)
@@ -196,7 +205,11 @@ func (m *model) renderRow(rw row) string {
 		return m.renderFileHeader(it.file, false)
 	case itemHunk:
 		f := m.files[it.file]
-		gut := st().Foreground(colDim).Render(fit("  "+strings.Repeat(" ", 2*m.numW-2)+"⋯", gw))
+		dots := "  ⋯"
+		if m.showNums {
+			dots = "  " + strings.Repeat(" ", 2*m.numW-2) + "⋯"
+		}
+		gut := st().Foreground(colDim).Render(fit(dots, gw))
 		text := f.Hunks[it.idx].Header
 		return gut + st().Foreground(colHunk).Render(fit(text, cw))
 	case itemNote:
@@ -250,8 +263,11 @@ func (m *model) renderLine(rw row, it item, gw, cw int) string {
 	if rw.seg > 0 {
 		signCh = " "
 	}
-	gutter := bar + mark + oldS.Render(num(l.OldNo)) + g.Render(" ") + newS.Render(num(l.NewNo)) +
-		g.Render(" ") + sign.Render(signCh) + g.Render(" ")
+	gutter := bar + mark
+	if m.showNums {
+		gutter += oldS.Render(num(l.OldNo)) + g.Render(" ") + newS.Render(num(l.NewNo)) + g.Render(" ")
+	}
+	gutter += sign.Render(signCh) + g.Render(" ")
 	_ = gw
 
 	var seg string
@@ -302,6 +318,9 @@ func (m *model) renderSidebar(sw, h int) []string {
 	rows = append(rows, srow{title + strings.Repeat(" ", max(1, sw-ansi.StringWidth(title)-ansi.StringWidth(count))) + count, -1})
 
 	curFile := m.curFile()
+	if m.fileListFull() {
+		curFile = m.fileSel
+	}
 	commentsPer := map[int]int{}
 	for _, c := range m.comments {
 		commentsPer[c.File]++
@@ -309,7 +328,7 @@ func (m *model) renderSidebar(sw, h int) []string {
 	curRow := 0
 	for i, f := range m.files {
 		if f.IsTest && (i == 0 || !m.files[i-1].IsTest) && i > 0 {
-			rows = append(rows, srow{st().Foreground(colDim).Render(fit(" ── tests "+strings.Repeat("─", sw), sw)), -1})
+			rows = append(rows, srow{st().Foreground(colDim).Render(fit(" ── tests "+strings.Repeat("─", max(0, sw-10)), sw)), -1})
 		}
 		isCur := i == curFile
 		base := st()
@@ -422,22 +441,29 @@ func (m *model) renderStatus() string {
 	if n := len(m.comments); n > 0 {
 		right = append(right, s(st().Foreground(colComment), fmt.Sprintf("● %d comment%s", n, plural(n))))
 	}
-	if m.wrap {
-		right = append(right, s(st().Foreground(colDim), "wrap"))
+	if !m.wrap {
+		right = append(right, s(st().Foreground(colDim), "nowrap"))
 	}
 	if m.anchor >= 0 {
 		_, lo, hi, _ := m.selection()
 		right = append(right, s(st().Foreground(colCursor), fmt.Sprintf("%d lines selected", hi-lo+1)))
 	}
 	total, viewed := len(m.files), m.viewedCount()
-	const barW = 16
+	barW := 16
+	if m.narrow() {
+		barW = 6
+	}
 	filled := 0
 	if total > 0 {
 		filled = (barW*viewed + total/2) / total
 	}
 	bar := s(st().Foreground(colGreen), strings.Repeat("█", filled)) +
 		s(st().Foreground(colDim), strings.Repeat("░", barW-filled))
-	right = append(right, bar+s(st(), fmt.Sprintf(" %d/%d viewed ", viewed, total)))
+	viewedLbl := " viewed"
+	if m.narrow() {
+		viewedLbl = ""
+	}
+	right = append(right, bar+s(st(), fmt.Sprintf(" %d/%d%s ", viewed, total, viewedLbl)))
 	rightStr := strings.Join(right, s(st(), "  "))
 	rw := ansi.StringWidth(rightStr)
 
@@ -446,11 +472,15 @@ func (m *model) renderStatus() string {
 		left = s(st().Foreground(colCursor).Bold(true), " "+m.message)
 	} else {
 		var hints [][2]string
-		switch m.mode {
-		case modeComment:
+		switch {
+		case m.mode == modeComment:
 			hints = [][2]string{{"enter", "save"}, {"alt+enter", "newline"}, {"esc", "cancel"}}
-		case modeHelp:
+		case m.mode == modeHelp:
 			hints = [][2]string{{"any key", "close help"}}
+		case m.fileListFull():
+			hints = [][2]string{{"j/k", "move"}, {"enter", "open"}, {"e", "close"}}
+		case m.narrow():
+			hints = [][2]string{{"c", "comment"}, {"v", "viewed"}, {"e", "files"}, {"?", "help"}}
 		default:
 			hints = [][2]string{{"j/k", "move"}, {"V", "select"}, {"c", "comment"}, {"v", "viewed"},
 				{"n/p", "file"}, {"w", "wrap"}, {"e", "files"}, {"?", "help"}, {"q", "quit"}}
@@ -509,7 +539,8 @@ func helpLines() []string {
 		"",
 		h("View"),
 		k("w", "toggle word wrap"),
-		k("e", "toggle file list"),
+		k("#", "toggle line numbers"),
+		k("e", "toggle file list (full screen on narrow terminals)"),
 		k("?", "toggle this help"),
 		"",
 		h("Quit"),
