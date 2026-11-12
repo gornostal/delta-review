@@ -237,12 +237,18 @@ func gitParentCommand() string {
 }
 
 // tmuxTheme reads the @theme option used by the delta-themed wrapper, so the
-// UI colours follow the same light/dark choice as delta.
+// UI colours follow the same light/dark choice as delta. The theme can be forced
+// per session, so it is read for this pane (falling back through session to the
+// global value), not just the global option.
 func tmuxTheme() (dark bool, ok bool) {
 	if os.Getenv("TMUX") == "" {
 		return false, false
 	}
-	out, err := exec.Command("tmux", "show", "-gqv", "@theme").Output()
+	args := []string{"display", "-p"}
+	if pane := os.Getenv("TMUX_PANE"); pane != "" {
+		args = append(args, "-t", pane)
+	}
+	out, err := exec.Command("tmux", append(args, "#{@theme}")...).Output()
 	if err != nil {
 		return false, false
 	}

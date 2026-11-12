@@ -94,7 +94,7 @@ its own gutter (cursor/selection bar, comment marker, old and new numbers, sign)
 - **Input details**: several keys that arrive in one read are handled one at a time. Mouse
   reporting uses cell-motion mode, so wheel, click and drag work (native terminal selection
   needs shift).
-- **Colours**: ANSI-256 palette colours that adapt to light/dark. Inside tmux, the `@theme`
+- **Colours**: ANSI-256 palette colours that adapt to light/dark. Inside tmux, the pane's `@theme`
   option (the one the user's delta wrapper reads) decides; elsewhere the terminal background is
   queried before the UI starts reading input.
 
